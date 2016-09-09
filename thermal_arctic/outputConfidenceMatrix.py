@@ -1,4 +1,4 @@
-import sys
+import sys, os
 import numpy as np
 import tensorflow as tf
 
@@ -24,19 +24,20 @@ def gen_roc_data(graph_path, file_list_path, image_folder_path):
 		for line in fp:
 			l = line.split()
 			img_name = l[0]
-			img_label = labels(int(l[1]))
-			img_path = os.path.join(image_folder_path, image_label, img_name)
+			img_label = labels[int(l[1])]
+			img_path = os.path.join(image_folder_path, img_label, img_name)
 			if not tf.gfile.Exists(img_path):
 				tf.logging.fatal('File does not exist %s', img_path)
                         	return answer
 			image_data.append([img_name, img_label, tf.gfile.FastGFile(img_path, 'rb').read()])
 		
-	# Creates graph from saved GraphDef.
-	create_graph(graph_path)
-
+	
 	with tf.Session() as sess:
 
-		softmax_tensor = sess.graph.get_tensor_by_name('final_result:0')
+		# Creates graph from saved GraphDef.
+		create_graph(graph_path)
+
+		softmax_tensor = sess.graph.get_tensor_by_name('final_result1:0')
 		
 		with open('roc_data.txt', 'w+') as fp:
 
@@ -46,32 +47,31 @@ def gen_roc_data(graph_path, file_list_path, image_folder_path):
 				predictions = np.squeeze(predictions)
 
 				top_k = predictions.argsort()[-5:][::-1]  # Getting top 5 predictions
-	
-				output_line = idata[0]
-				for label_id in range(len(labels)):
-					node_id = top_k.index(label_id)
-					output_line += predictions[node_id] + ','
 				
-				print output_line
+				output_line = idata[0] + ',' + idata[1] + ','
+				for label_id in range(len(labels)):
+					node_id = top_k.tolist().index(label_id)
+					#node_id = np.where(top_k == label_id)
+					output_line += str(predictions[top_k[node_id]]) + ','
+				output_line = output_line[:-1]
 
+				print "Should be", idata[1], "I'm thinking", top_k[0], output_line
 				output_line += '\n'
 				fp.write(output_line)		
-				
+			
 				answer = labels[top_k[0]]
 	return answer
 
 
 if __name__ == '__main__':
-	if len(sys.argv) < 4:
-		print "Usage: python gen_roc.py <graph_path> <text_file_path> <parent_image_folder>"
-	else:
-		graph_path = sys.argv[1]
-		file_list_path = sys.argv[2]
-		image_folder_path = sys.argv[3]	
-		print "Path to Graph:", graph_path
-		print "Path to text file:", file_list_path
-		print "Path to parent images folder", image_folder_path
+	graph_path = sys.argv[1]
+	file_list_path = sys.argv[2]
+	image_folder_path = sys.argv[3]	
+	print "Path to Graph:", graph_path
+	print "Path to text file:", file_list_path
+	print "Path to parent images folder", image_folder_path
 	
-		gen_roc_data(graph_path, file_list_path, image_folder_path)
+	gen_roc_data(graph_path, file_list_path, image_folder_path)
+
 
 
